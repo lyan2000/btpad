@@ -13,6 +13,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -21,6 +22,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -52,6 +54,37 @@ public final class MainActivity extends Activity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Opening the app is the user's intent to connect to the last host (once per launch).
+        // Rotation doesn't recreate the activity (configChanges), so it never reconnects.
+        autoConnect = savedInstanceState == null;
+        sender = new Sender((id, report) -> {
+            if (hid != null && resumed) hid.send(id, report);
+        }, getResources().getDisplayMetrics().density * 160 / 25.4f);
+        sender.naturalScroll = HidService.naturalScroll(this);
+        sender.setSpeed(HidService.pointerSpeed(this), HidService.scrollSpeed(this));
+        keyboard = new Keyboard(sender::send);
+        keyboard.changed = () -> strip.invalidate();
+        volumeKeys = HidService.volumeKeys(this);
+        bindViews();
+        if (!hasPermissions()) requestPermissions(PERMISSIONS, REQ_PERMISSIONS);
+    }
+
+    /**
+     * Rotation and other size changes re-inflate the layout in place (the manifest's
+     * configChanges): the service stays bound and nothing restarts. Whatever is held is
+     * released first, since the old views go away mid-gesture.
+     */
+    @Override
+    public void onConfigurationChanged(Configuration config) {
+        super.onConfigurationChanged(config);
+        boolean typing = typeField.isFocused();
+        stopInput();
+        bindViews();
+        if (typing) typeField.requestFocus();
+        refresh();
+    }
+
+    private void bindViews() {
         setContentView(R.layout.activity_main);
         dot = findViewById(R.id.dot);
         hostName = findViewById(R.id.host_name);
@@ -61,22 +94,12 @@ public final class MainActivity extends Activity
         pad = findViewById(R.id.pad);
         padLabel = findViewById(R.id.pad_label);
         unsupported = findViewById(R.id.unsupported);
-
-        // Opening the app is the user's intent to connect to the last host (once per launch).
-        autoConnect = savedInstanceState == null;
-        sender = new Sender((id, report) -> {
-            if (hid != null && resumed) hid.send(id, report);
-        }, getResources().getDisplayMetrics().density * 160 / 25.4f);
-        sender.naturalScroll = HidService.naturalScroll(this);
-        pad.setOutput(sender);
-
         strip = findViewById(R.id.strip);
         typeField = findViewById(R.id.type);
-        keyboard = new Keyboard(sender::send);
-        keyboard.changed = strip::invalidate;
+
+        pad.setOutput(sender);
         strip.setKeyboard(keyboard, typeField::clear);
         typeField.setKeyboard(keyboard, this::warnUnmappable);
-        volumeKeys = HidService.volumeKeys(this);
         View chip = findViewById(R.id.chip);
         chip.setOnClickListener(v -> pickHost());
         chip.setOnLongClickListener(v -> {
@@ -87,7 +110,6 @@ public final class MainActivity extends Activity
         disconnect.setOnClickListener(v -> {
             if (hid != null) hid.disconnect();
         });
-        if (!hasPermissions()) requestPermissions(PERMISSIONS, REQ_PERMISSIONS);
     }
 
     @Override
@@ -267,6 +289,11 @@ public final class MainActivity extends Activity
 
     // ---- Settings ----
 
+    /** Idle auto-disconnect choices (ms, 0 = off) and their labels. */
+    private static final long[] IDLE_MS = {0, 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000};
+    /** Speed slider steps: 2^(k/4) for k = -4..4, i.e. 0.5x to 2x with 1x in the middle. */
+    private static final int SPEED_STEPS = 4;
+
     /** The settings dialog: one tile per setting, each applied and saved as it changes. */
     private void showSettings() {
         LinearLayout list = new LinearLayout(this);
@@ -274,6 +301,14 @@ public final class MainActivity extends Activity
         int pad = Math.round(16 * getResources().getDisplayMetrics().density);
         list.setPadding(pad, pad / 2, pad, 0);
 
+        addSlider(list, R.string.pointer_speed, HidService.pointerSpeed(this), v -> {
+            HidService.setSpeeds(this, v, HidService.scrollSpeed(this));
+            sender.setSpeed(v, HidService.scrollSpeed(this));
+        });
+        addSlider(list, R.string.scroll_speed, HidService.scrollSpeed(this), v -> {
+            HidService.setSpeeds(this, HidService.pointerSpeed(this), v);
+            sender.setSpeed(HidService.pointerSpeed(this), v);
+        });
         addSwitch(list, R.string.natural_scroll, R.string.natural_scroll_summary,
                 HidService.naturalScroll(this), on -> {
                     HidService.setNaturalScroll(this, on);
@@ -283,6 +318,15 @@ public final class MainActivity extends Activity
             HidService.setVolumeKeys(this, on);
             volumeKeys = on;
         });
+        int idle = 0;
+        long idleMs = HidService.idleMs(this);
+        for (int i = 0; i < IDLE_MS.length; i++) if (IDLE_MS[i] == idleMs) idle = i;
+        addChoice(list, R.string.idle, getResources().getStringArray(R.array.idle_choices), idle,
+                i -> {
+                    HidService.setIdleMs(this, IDLE_MS[i]);
+                    if (hid != null) hid.idleChanged();
+                });
+        addItem(list, R.string.wake_help, R.string.wake_help_summary, this::showWakeHelp);
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(list);
@@ -293,22 +337,104 @@ public final class MainActivity extends Activity
                 .show();
     }
 
+    /** How to turn off Bluetooth wake on the computer; selectable so it can be copied. */
+    private void showWakeHelp() {
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle(R.string.wake_help)
+                .setMessage(R.string.wake_help_text)
+                .setPositiveButton(R.string.done, null)
+                .show();
+        TextView text = d.findViewById(android.R.id.message);
+        if (text != null) text.setTextIsSelectable(true);
+    }
+
     private interface OnToggle {
         void set(boolean on);
     }
 
-    /** An on/off setting: tapping anywhere on its tile flips the switch. */
-    private void addSwitch(LinearLayout list, int title, int summary, boolean on, OnToggle out) {
+    private interface OnValue {
+        void set(float value);
+    }
+
+    private interface OnPick {
+        void set(int index);
+    }
+
+    /** A setting tile: title and summary; the toggle shows only for switches. */
+    private View addRow(LinearLayout list, int title, CharSequence summary) {
         View row = getLayoutInflater().inflate(R.layout.setting_switch, list, false);
         ((TextView) row.findViewById(R.id.title)).setText(title);
         ((TextView) row.findViewById(R.id.summary)).setText(summary);
+        list.addView(row);
+        return row;
+    }
+
+    /** An on/off setting: tapping anywhere on its tile flips the switch. */
+    private void addSwitch(LinearLayout list, int title, int summary, boolean on, OnToggle out) {
+        View row = addRow(list, title, getText(summary));
         Switch toggle = row.findViewById(R.id.toggle);
+        toggle.setVisibility(View.VISIBLE);
         toggle.setChecked(on);
         row.setOnClickListener(v -> {
             toggle.toggle();
             out.set(toggle.isChecked());
         });
+    }
+
+    /** A tile that opens something (help). */
+    private void addItem(LinearLayout list, int title, int summary, Runnable open) {
+        addRow(list, title, getText(summary)).setOnClickListener(v -> open.run());
+    }
+
+    /** One of a few choices: the summary shows the current one, tapping opens the list. */
+    private void addChoice(LinearLayout list, int title, String[] labels, int index, OnPick out) {
+        View row = addRow(list, title, labels[index]);
+        TextView summary = row.findViewById(R.id.summary);
+        row.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, indexOf(labels, summary.getText()), (d, i) -> {
+                    summary.setText(labels[i]);
+                    out.set(i);
+                    d.dismiss();
+                })
+                .show());
+    }
+
+    private static int indexOf(String[] labels, CharSequence label) {
+        for (int i = 0; i < labels.length; i++) if (labels[i].contentEquals(label)) return i;
+        return -1;
+    }
+
+    /** A speed multiplier, 0.5x to 2x: the summary shows it as a percentage. */
+    private void addSlider(LinearLayout list, int title, float value, OnValue out) {
+        View row = getLayoutInflater().inflate(R.layout.setting_slider, list, false);
+        ((TextView) row.findViewById(R.id.title)).setText(title);
+        TextView summary = row.findViewById(R.id.summary);
+        SeekBar bar = row.findViewById(R.id.slider);
+        bar.setMax(2 * SPEED_STEPS);
+        int k = Math.round(SPEED_STEPS * (float) (Math.log(value) / Math.log(2)));
+        bar.setProgress(Math.max(-SPEED_STEPS, Math.min(SPEED_STEPS, k)) + SPEED_STEPS);
+        summary.setText(percent(value));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar s, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                float v = (float) Math.pow(2, (progress - SPEED_STEPS) / (double) SPEED_STEPS);
+                summary.setText(percent(v));
+                out.set(v);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar s) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar s) {}
+        });
         list.addView(row);
+    }
+
+    private static String percent(float v) {
+        return Math.round(v * 100) + "%";
     }
 
     // ---- Host picker ----

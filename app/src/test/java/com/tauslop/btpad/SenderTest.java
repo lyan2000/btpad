@@ -291,6 +291,34 @@ public class SenderTest {
         assertEquals(0, left[0]);
     }
 
+    /** Total dy for a one-finger pointer stroke moving vy px per 8 ms sample. */
+    private int pointerStroke(float vy) {
+        sent.clear();
+        long t = timer.now / MS * MS + 1_000 * MS;
+        float y = 200;
+        sender.touch(true);
+        sender.pointerDown(at(t), 200, y);
+        for (int k = 0; k < 50; k++) {
+            t += 8 * MS;
+            y += vy;
+            sender.pointerMove(at(t), 200, y);
+        }
+        sender.touch(false);
+        timer.advance(t + 300 * MS);
+        return sumDy(0);
+    }
+
+    @Test
+    public void speedSettingsScaleMotion() {
+        int pointer = pointerStroke(2), scrolled = scrollStroke(false, 0, -8)[0];
+        sender.setSpeed(2, 0.5f);
+        int fast = pointerStroke(2), slowScroll = scrollStroke(false, 0, -8)[0];
+        assertTrue(pointer + " -> " + fast, Math.abs(fast - 2 * pointer) <= 2);
+        assertTrue(scrolled + " -> " + slowScroll, Math.abs(2 * slowScroll - scrolled) <= 2);
+        sender.setSpeed(1, 1);
+        assertEquals(pointer, pointerStroke(2));
+    }
+
     // ---- Key reports ----
 
     private void assertKeySpacing() {

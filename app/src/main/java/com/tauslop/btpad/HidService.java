@@ -58,6 +58,8 @@ public final class HidService extends Service {
     private static final String KEY_IDLE_MS = "idle_ms";
     private static final String KEY_NATURAL_SCROLL = "natural_scroll";
     private static final String KEY_VOLUME_KEYS = "volume_keys";
+    private static final String KEY_POINTER_SPEED = "pointer_speed";
+    private static final String KEY_SCROLL_SPEED = "scroll_speed";
     private static final String CHANNEL = "link";
     private static final int NOTIFICATION_ID = 1;
     private static final long PROXY_TIMEOUT_MS = 5000;
@@ -226,8 +228,33 @@ public final class HidService extends Service {
         return prefs(c).getString(KEY_HOST, null);
     }
 
+    /** Auto-disconnect after this long without input; 0 = never. */
     static long idleMs(Context c) {
         return prefs(c).getLong(KEY_IDLE_MS, ConnectionPolicy.DEFAULT_IDLE_MS);
+    }
+
+    static void setIdleMs(Context c, long ms) {
+        prefs(c).edit().putLong(KEY_IDLE_MS, ms).apply();
+    }
+
+    /** The idle timeout setting changed: apply it to the current session too. */
+    void idleChanged() {
+        policy.setIdleMs(idleMs(this));
+        schedule();
+    }
+
+    /** Speed settings, multiples of the defaults (see Sender.setSpeed). */
+    static float pointerSpeed(Context c) {
+        return prefs(c).getFloat(KEY_POINTER_SPEED, 1);
+    }
+
+    static float scrollSpeed(Context c) {
+        return prefs(c).getFloat(KEY_SCROLL_SPEED, 1);
+    }
+
+    static void setSpeeds(Context c, float pointer, float scroll) {
+        prefs(c).edit().putFloat(KEY_POINTER_SPEED, pointer)
+                .putFloat(KEY_SCROLL_SPEED, scroll).apply();
     }
 
     /** Scroll direction (see Sender.naturalScroll); default off: wheel style. */

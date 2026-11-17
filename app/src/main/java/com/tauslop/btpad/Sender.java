@@ -128,6 +128,15 @@ final class Sender implements Gestures.Out {
         schedule();
     }
 
+    /**
+     * User speed settings, as multiples of the defaults: pointer scales COUNTS_PER_MM, scroll
+     * scales detents per mm (1 / MM_PER_DETENT).
+     */
+    void setSpeed(float pointer, float scrolling) {
+        motion.setCountsPerMm(Motion.COUNTS_PER_MM * pointer);
+        scroll.setCountsPerMm(scrolling / MM_PER_DETENT);
+    }
+
     /** Button state change: carries the motion that preceded it. */
     @Override
     public void buttons(int b) {

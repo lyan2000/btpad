@@ -27,7 +27,8 @@ final class Motion {
 
     private static final int CAPACITY = 32;
 
-    private final float pxPerMm, countsPerMm, maxGain;
+    private final float pxPerMm, maxGain;
+    private float countsPerMm;
     private final long[] t = new long[CAPACITY];
     private final float[] x = new float[CAPACITY], y = new float[CAPACITY];
     private int n;
@@ -49,6 +50,11 @@ final class Motion {
         this.pxPerMm = pxPerMm;
         this.countsPerMm = countsPerMm;
         this.maxGain = maxGain;
+    }
+
+    /** New base sensitivity (user speed setting); applies from the next tick. */
+    void setCountsPerMm(float countsPerMm) {
+        this.countsPerMm = countsPerMm;
     }
 
     /** Gain for a finger speed: 1 when slow, rising smoothly toward MAX_GAIN. */

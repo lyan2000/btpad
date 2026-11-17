@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One on/off setting in the settings dialog: the whole tile toggles the switch. -->
+<!-- One setting tile in the settings dialog: title, summary and (switches only) a toggle. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -40,5 +40,6 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:clickable="false"
-        android:focusable="false" />
+        android:focusable="false"
+        android:visibility="gone" />
 </LinearLayout>
