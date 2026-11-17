@@ -72,6 +72,35 @@ final class Keys {
         return k;
     }
 
+    /** Usage of the U key (Ctrl+Shift+U starts IBus/GTK Unicode entry). */
+    static final int U = A + ('u' - 'a');
+
+    /** U+FE0E/U+FE0F pick text or emoji style: dropped, never typed (they cost no Backspace). */
+    static boolean isVariationSelector(int cp) {
+        return cp == 0xFE0E || cp == 0xFE0F;
+    }
+
+    /**
+     * Whether a code point the US map can't type may be entered as Unicode (Ctrl+Shift+U, hex,
+     * Space): any scalar from U+00A0 on except surrogates and the variation selectors.
+     */
+    static boolean unicodeEnterable(int cp) {
+        return cp >= 0xA0 && cp <= Character.MAX_CODE_POINT
+                && !(cp >= Character.MIN_SURROGATE && cp <= Character.MAX_SURROGATE)
+                && !isVariationSelector(cp);
+    }
+
+    /**
+     * Keyboard usages of the lower-case hex digits of {@code cp}, no leading zeros (plain keys:
+     * IBus takes either case, so Caps Lock needs no Shift inversion).
+     */
+    static int[] hexUsages(int cp) {
+        String hex = Integer.toHexString(cp);
+        int[] u = new int[hex.length()];
+        for (int i = 0; i < u.length; i++) u[i] = forChar(hex.charAt(i));
+        return u;
+    }
+
     static boolean isModifier(int usage) {
         return usage >= MOD_FIRST && usage <= MOD_LAST;
     }

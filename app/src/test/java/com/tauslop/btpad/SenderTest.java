@@ -405,4 +405,58 @@ public class SenderTest {
         sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
         assertEquals(3, keys.size());
     }
+
+    @Test
+    public void pausesHoldTheKeyQueueInOrder() {
+        timer.advance(1_000 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0));
+        sender.pause(120 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.SPACE));
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0));
+        timer.advance(timer.now + 500 * MS);
+        assertEquals(4, keys.size());
+        assertKeySpacing();
+        assertEquals(Keys.SPACE, keys.get(2)[3]);
+        long gap = keyTimes.get(2) - keyTimes.get(1);
+        assertTrue("gap " + gap, gap >= 119 * MS && gap <= 122 * MS);
+    }
+
+    @Test
+    public void pauseAfterIdleCostsNothingExtra() {
+        timer.advance(1_000 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0));
+        sender.pause(30 * MS);
+        timer.advance(1_500 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
+        assertEquals(3, keys.size());
+        assertEquals(1_500 * MS, (long) keyTimes.get(2));
+    }
+
+    @Test
+    public void resetDropsPendingPauses() {
+        timer.advance(1_000 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
+        sender.pause(500 * MS);
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A + 1));
+        sender.reset();
+        int n = keys.size();
+        sender.send(Hid.ID_KEYBOARD, Hid.keyboard(0, Keys.A));
+        timer.advance(timer.now + 20 * MS); // one tick, not the 500 ms pause
+        assertEquals(n + 1, keys.size());
+    }
+
+    @Test
+    public void unicodeEntryThroughSender() {
+        timer.advance(1_000 * MS);
+        Keyboard kb = new Keyboard(sender);
+        kb.unicode = true;
+        kb.edit("", "你");
+        timer.advance(timer.now + 1_000 * MS);
+        assertKeySpacing();
+        assertEquals(12, keys.size()); // C+S+U, up, 4 digits x2, Space, up
+        long gap = keyTimes.get(2) - keyTimes.get(1);
+        assertTrue("gap " + gap, gap >= 119 * MS);
+    }
 }

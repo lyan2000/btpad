@@ -13,7 +13,8 @@ import java.util.Arrays;
  * least a tick apart, so a quick press and release still reach the host as two reports.
  * Keyboard and consumer reports go through their own ordered queue, also at most one per tick,
  * so a burst of typed text (voice dictation) is paced out without merging or dropping a press
- * or release. Ticks are posted only while something is pending, so an idle pad costs nothing.
+ * or release. Pauses in that queue (Unicode entry, see Keyboard.unicode) hold the reports after
+ * them. Ticks are posted only while something is pending, so an idle pad costs nothing.
  *
  * <p>Keys don't wake the link the way touches do: if it was idle, the first key waits for the
  * next sniff anchor (up to ~225 ms), and the reports after it follow in order.
@@ -26,7 +27,7 @@ import java.util.Arrays;
  * motion), then another whenever nothing was sent for {@link #KEEPALIVE_NS}. Nothing once all
  * fingers lift.
  */
-final class Sender implements Gestures.Out {
+final class Sender implements Gestures.Out, Keyboard.Out {
     interface Sink {
         void send(int id, byte[] report);
     }
@@ -70,10 +71,16 @@ final class Sender implements Gestures.Out {
     /** Nominal time of the next tick, ns. System.nanoTime and uptimeMillis share a clock. */
     private long next;
 
-    /** Keyboard/consumer reports waiting their turn: report ID, then the report bytes. */
+    /**
+     * Keyboard/consumer reports waiting their turn: report ID, then the report bytes. A pause
+     * is ID {@link #PAUSE}, then its length in ns (8 bytes, big-endian).
+     */
     private final ArrayDeque<byte[]> keys = new ArrayDeque<>();
+    private static final byte PAUSE = 0;
     /** When the last key report went out, ns. */
     private long lastKey = Long.MIN_VALUE / 2;
+    /** No key report before this, ns (set by pauses). */
+    private long keyNotBefore = Long.MIN_VALUE / 2;
     /** Last keyboard report queued (repeats of it are dropped). */
     private byte[] lastKeyboard = new byte[Hid.KEYBOARD_LEN];
     /** The host may have keys / a consumer usage down. */
@@ -159,7 +166,8 @@ final class Sender implements Gestures.Out {
      * merged or dropped. A keyboard report equal to the previous one changes nothing and is
      * skipped.
      */
-    void send(int id, byte[] report) {
+    @Override
+    public void send(int id, byte[] report) {
         if (id == Hid.ID_KEYBOARD) {
             if (Arrays.equals(report, lastKeyboard)) return;
             lastKeyboard = report;
@@ -167,13 +175,28 @@ final class Sender implements Gestures.Out {
         byte[] e = new byte[report.length + 1];
         e[0] = (byte) id;
         System.arraycopy(report, 0, e, 1, report.length);
+        enqueue(e);
+    }
+
+    /** Hold the key queue: the next key report goes out at least {@code ns} after the last. */
+    @Override
+    public void pause(long ns) {
+        byte[] e = new byte[9];
+        e[0] = PAUSE;
+        for (int i = 0; i < 8; i++) e[8 - i] = (byte) (ns >>> (8 * i));
+        enqueue(e);
+    }
+
+    private void enqueue(byte[] e) {
         keys.add(e);
         if (keys.size() == 1) keyTick();
     }
 
     private void keyTick() {
         long now = timer.now();
-        if (now - lastKey >= BUTTON_GAP_NS) {
+        takePauses();
+        // 1 ms of slack, like BUTTON_GAP_NS, for timer rounding.
+        if (!keys.isEmpty() && now - lastKey >= BUTTON_GAP_NS && now >= keyNotBefore - 1_000_000) {
             byte[] e = keys.poll();
             byte[] r = Arrays.copyOfRange(e, 1, e.length);
             boolean down = false;
@@ -181,8 +204,19 @@ final class Sender implements Gestures.Out {
             if (e[0] == Hid.ID_KEYBOARD) keyboardDown = down; else consumerDown = down;
             lastKey = now;
             sink.send(e[0], r);
+            takePauses();
         }
-        if (!keys.isEmpty()) timer.at(keyTick, lastKey + Motion.TICK_NS);
+        if (!keys.isEmpty()) timer.at(keyTick, Math.max(lastKey + Motion.TICK_NS, keyNotBefore));
+    }
+
+    /** Pauses at the head of the queue start counting from the last key report. */
+    private void takePauses() {
+        while (!keys.isEmpty() && keys.peek()[0] == PAUSE) {
+            byte[] e = keys.poll();
+            long ns = 0;
+            for (int i = 1; i < 9; i++) ns = ns << 8 | (e[i] & 0xFF);
+            keyNotBefore = Math.max(keyNotBefore, lastKey + ns);
+        }
     }
 
     /** Drop pending work and release held buttons and keys (activity paused, link changed). */
@@ -191,6 +225,7 @@ final class Sender implements Gestures.Out {
         timer.cancel(keepalive);
         timer.cancel(keyTick);
         keys.clear();
+        keyNotBefore = Long.MIN_VALUE / 2;
         lastKeyboard = new byte[Hid.KEYBOARD_LEN];
         if (keyboardDown) {
             keyboardDown = false;

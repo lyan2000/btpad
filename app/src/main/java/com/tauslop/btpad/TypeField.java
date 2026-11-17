@@ -10,6 +10,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.InputMethodSubtype;
 import android.widget.EditText;
 
 /**
@@ -23,6 +24,12 @@ import android.widget.EditText;
  * without it Backspace would be lost. After a key that moves the host's cursor (Enter, arrows,
  * strip keys) the field is cleared without sending deletes, and so is a long text at a word
  * break, so it never grows without bound.
+ *
+ * <p>Composing text (the IME's underlined word) is typed live like committed text, so English
+ * words appear on the host as they're typed. With a Chinese IME it isn't: its composing text is
+ * pinyin, so only what it commits (the chosen characters) is typed. The host mirror
+ * ({@link #sent}) counts each code point the host received as one character (a Unicode entry
+ * too) and skipped ones as none, so later deletes send the right Backspaces.
  */
 public final class TypeField extends EditText {
     /** Clear at the next word break once the text is this long. */
@@ -74,15 +81,37 @@ public final class TypeField extends EditText {
         removeCallbacks(sync);
         if (keyboard == null) return;
         Editable t = getText();
-        String now = t.toString();
+        String now = chineseIme()
+                ? Keyboard.committed(t, BaseInputConnection.getComposingSpanStart(t),
+                        BaseInputConnection.getComposingSpanEnd(t))
+                : t.toString();
         if (now.equals(sent)) return;
         int skipped = keyboard.edit(sent, now);
         sent = now;
         if (skipped > 0 && onUnmappable != null) onUnmappable.run();
-        if (now.indexOf('\n') >= 0 || (now.length() >= MAX_CHARS && now.endsWith(" ")
+        if (now.indexOf('\n') >= 0 || (now.length() >= MAX_CHARS && atBreak(now)
                 && BaseInputConnection.getComposingSpanStart(t) < 0)) {
             clear();
         }
+    }
+
+    /**
+     * A safe place to forget the text: after a space, or after a CJK character or emoji
+     * (U+2E80 on; Chinese has no spaces, so a long dictation would otherwise never clear).
+     */
+    private static boolean atBreak(String s) {
+        return s.endsWith(" ") || s.codePointBefore(s.length()) >= 0x2E80;
+    }
+
+    /** Whether the current IME subtype is Chinese (its composing text is pinyin, not text). */
+    @SuppressWarnings("deprecation") // getLocale: fallback for subtypes without a language tag
+    private boolean chineseIme() {
+        InputMethodManager imm = getContext().getSystemService(InputMethodManager.class);
+        InputMethodSubtype st = imm == null ? null : imm.getCurrentInputMethodSubtype();
+        if (st == null) return false;
+        String tag = st.getLanguageTag();
+        if (tag == null || tag.isEmpty()) tag = st.getLocale();
+        return tag != null && tag.startsWith("zh");
     }
 
     @Override

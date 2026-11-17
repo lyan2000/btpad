@@ -62,8 +62,9 @@ public final class MainActivity extends Activity
         }, getResources().getDisplayMetrics().density * 160 / 25.4f);
         sender.naturalScroll = HidService.naturalScroll(this);
         sender.setSpeed(HidService.pointerSpeed(this), HidService.scrollSpeed(this));
-        keyboard = new Keyboard(sender::send);
+        keyboard = new Keyboard(sender);
         keyboard.changed = () -> strip.invalidate();
+        keyboard.unicode = HidService.unicodeInput(this);
         volumeKeys = HidService.volumeKeys(this);
         bindViews();
         if (!hasPermissions()) requestPermissions(PERMISSIONS, REQ_PERMISSIONS);
@@ -227,7 +228,7 @@ public final class MainActivity extends Activity
     }
 
     private void warnUnmappable() {
-        if (warnedUnmappable) return;
+        if (warnedUnmappable || keyboard.unicode) return;
         warnedUnmappable = true;
         Toast.makeText(this, R.string.unmappable, Toast.LENGTH_SHORT).show();
     }
@@ -318,6 +319,12 @@ public final class MainActivity extends Activity
             HidService.setVolumeKeys(this, on);
             volumeKeys = on;
         });
+        addSwitch(list, R.string.unicode_input, R.string.unicode_input_summary,
+                keyboard.unicode, on -> {
+                    HidService.setUnicodeInput(this, on);
+                    keyboard.unicode = on;
+                    typeField.clear(); // its text was typed under the old rule
+                });
         int idle = 0;
         long idleMs = HidService.idleMs(this);
         for (int i = 0; i < IDLE_MS.length; i++) if (IDLE_MS[i] == idleMs) idle = i;

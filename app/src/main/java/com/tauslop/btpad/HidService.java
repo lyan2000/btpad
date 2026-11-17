@@ -58,6 +58,7 @@ public final class HidService extends Service {
     private static final String KEY_IDLE_MS = "idle_ms";
     private static final String KEY_NATURAL_SCROLL = "natural_scroll";
     private static final String KEY_VOLUME_KEYS = "volume_keys";
+    private static final String KEY_UNICODE_INPUT = "unicode_input";
     private static final String KEY_POINTER_SPEED = "pointer_speed";
     private static final String KEY_SCROLL_SPEED = "scroll_speed";
     private static final String CHANNEL = "link";
@@ -273,6 +274,15 @@ public final class HidService extends Service {
 
     static void setVolumeKeys(Context c, boolean on) {
         prefs(c).edit().putBoolean(KEY_VOLUME_KEYS, on).apply();
+    }
+
+    /** Characters a US keyboard can't type go as Ctrl+Shift+U Unicode entry; default on. */
+    static boolean unicodeInput(Context c) {
+        return prefs(c).getBoolean(KEY_UNICODE_INPUT, true);
+    }
+
+    static void setUnicodeInput(Context c, boolean on) {
+        prefs(c).edit().putBoolean(KEY_UNICODE_INPUT, on).apply();
     }
 
     private static SharedPreferences prefs(Context c) {

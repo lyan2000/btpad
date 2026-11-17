@@ -44,5 +44,7 @@
     <string name="wake_help_summary">Turn off Bluetooth wake on the computer</string>
     <string name="wake_help_text" tools:ignore="Typos">Linux: busctl set-property org.bluez /org/bluez/hci0/dev_XX_XX_XX_XX_XX_XX org.bluez.Device1 WakeAllowed b false (XX_… is this phone\'s address from bluetoothctl devices), or write disabled to the Bluetooth controller\'s power/wakeup in /sys.\n\nWindows: Device Manager → Bluetooth adapter → Power Management → uncheck “Allow this device to wake the computer”.\n\nmacOS: System Settings → Bluetooth → Advanced → uncheck “Allow Bluetooth devices to wake this computer” (wording varies by version).</string>
     <string name="type_hint">Type here…</string>
-    <string name="unmappable">Some characters can\'t be typed (US keyboard only)</string>
+    <string name="unicode_input">Type other characters (Linux)</string>
+    <string name="unicode_input_summary">Chinese, emoji, accents via Ctrl+Shift+U</string>
+    <string name="unmappable">Some characters can\'t be typed. Try Settings › Type other characters (Linux).</string>
 </resources>
