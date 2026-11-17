@@ -107,6 +107,7 @@ public final class TouchpadView extends View {
             case MotionEvent.ACTION_UP:
                 gestures.move(time, e.getPointerId(i), e.getX(i), e.getY(i));
                 gestures.up(time, e.getPointerId(i));
+                if (action == MotionEvent.ACTION_UP) performClick(); // accessibility
                 break;
             case MotionEvent.ACTION_CANCEL:
                 cancel();
@@ -114,6 +115,11 @@ public final class TouchpadView extends View {
         }
         scheduleTimeout();
         return true;
+    }
+
+    @Override
+    public boolean performClick() {
+        return super.performClick();
     }
 
     private void scheduleTimeout() {

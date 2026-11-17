@@ -198,12 +198,18 @@ public final class KeyStripView extends View {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
                 if (id < MAX_POINTERS) keyUp(id);
+                if (e.getActionMasked() == MotionEvent.ACTION_UP) performClick(); // accessibility
                 break;
             case MotionEvent.ACTION_CANCEL:
                 for (int p = 0; p < MAX_POINTERS; p++) keyUp(p);
                 break;
         }
         return true;
+    }
+
+    @Override
+    public boolean performClick() {
+        return super.performClick();
     }
 
     private void keyDown(int id, int code) {

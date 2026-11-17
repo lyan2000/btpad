@@ -55,6 +55,13 @@ android {
         }
     }
 
+    // The Kotlin stdlib's builtins metadata comes in via the toolchain; this app is pure Java.
+    packaging {
+        resources {
+            excludes += ['kotlin/**']
+        }
+    }
+
     // Keep the APK minimal: no dependency metadata block.
     dependenciesInfo {
         includeInApk = false
