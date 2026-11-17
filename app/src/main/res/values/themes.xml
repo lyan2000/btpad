@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light palette (dark palette in values-night/themes.xml) -->
+    <color name="bg">#FFF7F7FC</color>
+    <color name="surface">#FFE8EAF6</color>
+    <color name="text">#FF1A1B2E</color>
+    <color name="text_secondary">#FF5F6075</color>
+    <color name="accent">#FF3F51B5</color>
+    <color name="on_accent">#FFFFFFFF</color>
+    <color name="icon_bg">#FF283593</color>
+    <color name="pad">#FFE8EAF6</color>
+    <color name="pad_stroke">#FFE8EAF6</color>
+    <bool name="light_bars">true</bool>
+
+    <!-- Platform.* pick light/dark widgets; overridden in values-night. -->
+    <style name="Platform.AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Platform.AppTheme.Dialog" parent="android:Theme.Material.Light.Dialog.Alert" />
+
+    <!-- Framework AlertDialogs (host picker, settings) in the app's palette. -->
+    <style name="AppTheme.Dialog" parent="Platform.AppTheme.Dialog">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@drawable/dialog_bg</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorAlertDialogListItem">@color/text</item>
+    </style>
+
+    <style name="Base.AppTheme" parent="Platform.AppTheme">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorPrimary">@color/bg</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:alertDialogTheme">@style/AppTheme.Dialog</item>
+    </style>
+
+    <style name="AppTheme" parent="Base.AppTheme">
+        <item name="android:windowLightNavigationBar">@bool/light_bars</item>
+    </style>
+</resources>

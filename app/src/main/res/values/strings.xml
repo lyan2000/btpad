@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BTPad</string>
+    <string name="channel_name">Bluetooth connection</string>
+    <string name="connected_to">Connected to %1$s</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="no_host">No computer</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_pairing">Waiting for a computer to pair…</string>
+    <string name="status_idle">Not connected · tap to connect</string>
+    <string name="status_bt_off">Bluetooth is off · tap to turn on</string>
+    <string name="status_permission">Tap to allow Bluetooth access</string>
+    <string name="msg_disconnected">Disconnected</string>
+    <string name="msg_host_dropped">Computer disconnected</string>
+    <string name="msg_unreachable">Computer didn\'t answer</string>
+    <string name="msg_pair_timeout">Pairing timed out</string>
+    <string name="msg_background">Disconnected: app was in the background</string>
+    <string name="msg_idle">Disconnected after inactivity</string>
+    <string name="msg_screen_off">Disconnected: screen turned off</string>
+    <string name="msg_failed">Couldn\'t start keyboard mode</string>
+    <string name="choose_host">Connect to</string>
+    <string name="pair_new">Pair new computer…</string>
+    <string name="pair_hint">To pair: tap above, choose “Pair new computer”, then add a Bluetooth device on your computer and pick this phone. If the computer already knows this phone, remove it there first.</string>
+    <string name="unsupported">This phone doesn\'t support Bluetooth keyboard mode.</string>
+    <string name="pad_label">Touchpad</string>
+    <string name="settings">Settings</string>
+    <string name="done">Done</string>
+    <string name="natural_scroll">Natural scrolling</string>
+    <string name="natural_scroll_summary">Content follows your fingers</string>
+    <string name="volume_keys">Volume buttons control computer</string>
+    <string name="volume_keys_summary">While connected</string>
+    <string name="type_hint">Type here…</string>
+    <string name="unmappable">Some characters can\'t be typed (US keyboard only)</string>
+</resources>
